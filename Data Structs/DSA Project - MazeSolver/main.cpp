@@ -1,33 +1,29 @@
 #include <iostream>
 #include <stack>
-#include <queue>
 #include <set>
 using namespace std;
 
 #define OLC_PGE_APPLICATION
 #include "olcPixelGameEngine.h"
 
-// Override base class with your custom functionality
 class Maze : public olc::PixelGameEngine
 {
 public:
 	Maze()
 	{
-		// Name your application
 		sAppName = "Maze";
-		m_mazeCompleted = false;
-		m_mazeSolved = false;
+		mazeCreated = false;
+		mazeSolved = false;
 	}
 
 private:
-	int m_nMazeWidth;
-	int m_nMazeHeight;
-	int* m_maze;
+	int mazeWidth;
+	int mazeHeight;
+	int* mazeArr;
 
-	//int* m_mazeSolve;
+	int screenWidth;
+	int screenHeight;
 
-	int m_nScreenWidth;
-	int m_nScreenHeight;
 
 	enum
 	{
@@ -38,176 +34,70 @@ private:
 		CELL_VISITED = 0x10,
 	};
 
-	int m_nVisitedCells;
-	int m_nPathWidth;
+	int visitedCells;
+	int pathWidth;
 
-	stack<pair<int, int>> m_stack;
+	stack<pair<int, int>> creationStack;
 
 	// For completing the maze
-	stack<pair<int, int>> m_solutionStack;
-	int m_solutionSteps;
-	bool m_mazeCompleted;
-	bool m_mazeSolved;
+	int startingPosX, startingPosY;
+	int endingPosX, endingPosY;
+
+	stack<pair<int, int>> solutionStack;
+	int solutionSteps;
+	bool mazeCreated;
+	bool mazeSolved;
 	bool shortestRouteFound;
-	set<pair<int, int>> visited_neighbours;
-	vector<pair<int, int>> fastest_route;
+	set<pair<int, int>> visitedNeighbours;
+	vector<pair<int, int>> shortestRoute;
 
 protected:
 	// Called once at the start, so create things here
 	virtual bool OnUserCreate()
 	{
-		//maze parameter
-		m_nMazeWidth = 40;	//40
-		m_nMazeHeight = 25;	//25
-		//m_nMazeWidth = 10;
-		//m_nMazeHeight = 10;
+		srand(time(nullptr));
 
-		m_maze = new int[m_nMazeWidth * m_nMazeHeight];
-		memset(m_maze, 0x00, m_nMazeWidth * m_nMazeHeight * sizeof(int));
-		m_nPathWidth = 3;
+		//maze parameters
+		mazeWidth = 40;
+		mazeHeight = 25;
+		pathWidth = 3;
 
+		mazeArr = new int[mazeWidth * mazeHeight];
+
+		memset(mazeArr, 0x00, mazeWidth * mazeHeight * sizeof(int));
 
 		//push the starting location of the maze generator 
-		int x = rand() % m_nMazeWidth;
-		int y = rand() % m_nMazeHeight;
-		m_stack.push(make_pair(x, y));
-		m_maze[y * m_nMazeWidth + x] = CELL_VISITED;
-		m_nVisitedCells = 1;
+		int x = rand() % mazeWidth;
+		int y = rand() % mazeHeight;
+		creationStack.push(make_pair(x, y));
+		mazeArr[y * mazeWidth + x] = CELL_VISITED;
+		visitedCells = 1;
 
+		// For the starting/ending cells location post maze creation
+		startingPosX = rand() % mazeWidth;
+		startingPosY = rand() % mazeHeight;
+		endingPosX = rand() % mazeWidth;
+		endingPosY = rand() % mazeHeight;
 		return true;
 	}
 
 	virtual bool OnUserUpdate(float fElapsedTime)
 	{
-		// slow down the maze creation
-		/*if (m_mazeCompleted) {
-			this_thread::sleep_for(50ms);
-		}*/
-		//this_thread::sleep_for(100ms);
 
-		auto offset = [&](int x, int y)
-			{
-				return (m_stack.top().second + y) * m_nMazeWidth + (m_stack.top().first + x);
-			};
+		// Edit this to change fps (speed of completion)
+		this_thread::sleep_for(5ms);
+		
 
-
-		if (!m_mazeCompleted)	// generate maze
+		if (!mazeCreated)
 		{
-			if (m_nVisitedCells < m_nMazeWidth * m_nMazeHeight) {
-				if (m_nVisitedCells < m_nMazeWidth * m_nMazeHeight)
-				{
-					vector<int> neighbours;
-
-					// Search for neighbouring cells
-					// North neighbour
-					if (m_stack.top().second > 0 && (m_maze[offset(0, -1)] & CELL_VISITED) == 0)	// if it isn't looking along the top row
-						neighbours.push_back(0);
-
-					// East neighbour
-					if (m_stack.top().first < m_nMazeWidth - 1 && (m_maze[offset(1, 0)] & CELL_VISITED) == 0)	// if it isn't looking along the top row
-						neighbours.push_back(1);
-
-					// South neighbour
-					if (m_stack.top().second < m_nMazeHeight - 1 && (m_maze[offset(0, 1)] & CELL_VISITED) == 0)	// if it isn't looking along the top row
-						neighbours.push_back(2);
-
-					// West neighbour
-					if (m_stack.top().first > 0 && (m_maze[offset(-1, 0)] & CELL_VISITED) == 0)	// if it isn't looking along the top row
-						neighbours.push_back(3);
-
-
-					// If there are available neighbours
-					if (!neighbours.empty())
-					{
-						int next_cell_dir = neighbours[rand() % neighbours.size()];		// choose random direction to go
-
-						// Create path between neighbour and current cell
-						switch (next_cell_dir)
-						{
-						case 0: // North
-							m_maze[offset(0, -1)] |= CELL_VISITED | CELL_PATH_S;
-							m_maze[offset(0, 0)] |= CELL_PATH_N;
-							m_stack.push(make_pair((m_stack.top().first + 0), (m_stack.top().second - 1)));
-							break;
-
-						case 1: // East
-							m_maze[offset(1, 0)] |= CELL_VISITED | CELL_PATH_W;
-							m_maze[offset(0, 0)] |= CELL_PATH_E;
-							m_stack.push(make_pair((m_stack.top().first + 1), (m_stack.top().second + 0)));
-							break;
-
-						case 2: // South
-							m_maze[offset(0, 1)] |= CELL_VISITED | CELL_PATH_N;
-							m_maze[offset(0, 0)] |= CELL_PATH_S;
-							m_stack.push(make_pair((m_stack.top().first + 0), (m_stack.top().second + 1)));
-							break;
-
-						case 3: // West
-							m_maze[offset(-1, 0)] |= CELL_VISITED | CELL_PATH_E;
-							m_maze[offset(0, 0)] |= CELL_PATH_W;
-							m_stack.push(make_pair((m_stack.top().first - 1), (m_stack.top().second + 0)));
-							break;
-						}
-
-						//new cell
-						m_maze[offset(0, 0)] |= CELL_VISITED;
-						m_nVisitedCells++;
-
-					}
-					else {
-						m_stack.pop();	// backtrack
-					}
-				}
-
-				for (int x = 0; x < m_nMazeWidth; x++)
-				{
-					for (int y = 0; y < m_nMazeHeight; y++)
-					{
-						for (int py = 0; py < m_nPathWidth; py++)		//this draws in each cell to make the walls
-							for (int px = 0; px < m_nPathWidth; px++)
-							{
-								if (m_maze[y * m_nMazeWidth + x] & CELL_VISITED)
-									Draw(x * (m_nPathWidth + 1) + px, y * (m_nPathWidth + 1) + py, olc::WHITE);
-								else
-									Draw(x * (m_nPathWidth + 1) + px, y * (m_nPathWidth + 1) + py, olc::BLUE);
-							}
-
-						// for drawing the path ways (through walls)
-						for (int p = 0; p < m_nPathWidth; p++)
-						{
-							if (m_maze[y * m_nMazeWidth + x] & CELL_PATH_S)
-								Draw(x * (m_nPathWidth + 1) + p, y * (m_nPathWidth + 1) + m_nPathWidth, olc::WHITE); // Draw South Passage
-							if (m_maze[y * m_nMazeWidth + x] & CELL_PATH_E)
-								Draw(x * (m_nPathWidth + 1) + m_nPathWidth, y * (m_nPathWidth + 1) + p, olc::WHITE); // Draw East Passage
-						}
-
-					}
-				}
-
-				// for colouring the cell at the top of the stack 
-				if (m_nVisitedCells < m_nMazeWidth * m_nMazeHeight) {
-					for (int py = 0; py < m_nPathWidth; py++)
-						for (int px = 0; px < m_nPathWidth; px++)
-							Draw(m_stack.top().first * (m_nPathWidth + 1) + px, m_stack.top().second * (m_nPathWidth + 1) + py, olc::BLACK);
-				}
-
-			}
-			else	// maze creation is completed
-			{
-				m_solutionStack.push(make_pair(0, 0));	// start from top left corner, will change to random at some point
-				visited_neighbours.insert(make_pair(0, 0));
-				//cout << "Solution stack starts " << m_solutionStack.top().first << ", " << m_solutionStack.top().second << "\n";
-				m_solutionSteps = 1;
-				m_mazeCompleted = true;
-			}
+			CreateMaze();
 		}
-		else if (!m_mazeSolved)		// maze solving algorithm
-		{
-			DrawCell(0, 0, olc::GREEN);
-			DrawCell(m_nMazeWidth - 1, m_nMazeHeight - 1, olc::RED);
+		else if (!mazeSolved)		
+		{			
 			SolveMaze();
 		}
-		else if (!shortestRouteFound){
+		else if (!shortestRouteFound)
+		{
 			DrawShortestRoute();
 		}
 
@@ -215,65 +105,185 @@ protected:
 
 	}
 
+	void CreateMaze() {
+
+		auto offset = [&](int x, int y)
+			{
+				return (creationStack.top().second + y) * mazeWidth + (creationStack.top().first + x);
+			};
+
+		if (visitedCells < mazeWidth * mazeHeight) {
+			if (visitedCells < mazeWidth * mazeHeight)
+			{
+				vector<int> neighbours;
+
+				// Search for neighbouring cells
+				// North neighbour
+				if (creationStack.top().second > 0 && (mazeArr[offset(0, -1)] & CELL_VISITED) == 0)	// if it isn't looking along the top row
+					neighbours.push_back(0);
+
+				// East neighbour
+				if (creationStack.top().first < mazeWidth - 1 && (mazeArr[offset(1, 0)] & CELL_VISITED) == 0)	// if it isn't looking along the top row
+					neighbours.push_back(1);
+
+				// South neighbour
+				if (creationStack.top().second < mazeHeight - 1 && (mazeArr[offset(0, 1)] & CELL_VISITED) == 0)	// if it isn't looking along the top row
+					neighbours.push_back(2);
+
+				// West neighbour
+				if (creationStack.top().first > 0 && (mazeArr[offset(-1, 0)] & CELL_VISITED) == 0)	// if it isn't looking along the top row
+					neighbours.push_back(3);
+
+
+				// If there are available neighbours
+				if (!neighbours.empty())
+				{
+					int next_cell_dir = neighbours[rand() % neighbours.size()];		// choose random direction to go
+
+					// Create path between neighbour and current cell
+					switch (next_cell_dir)
+					{
+					case 0: // North
+						mazeArr[offset(0, -1)] |= CELL_VISITED | CELL_PATH_S;
+						mazeArr[offset(0, 0)] |= CELL_PATH_N;
+						creationStack.push(make_pair((creationStack.top().first + 0), (creationStack.top().second - 1)));
+						break;
+
+					case 1: // East
+						mazeArr[offset(1, 0)] |= CELL_VISITED | CELL_PATH_W;
+						mazeArr[offset(0, 0)] |= CELL_PATH_E;
+						creationStack.push(make_pair((creationStack.top().first + 1), (creationStack.top().second + 0)));
+						break;
+
+					case 2: // South
+						mazeArr[offset(0, 1)] |= CELL_VISITED | CELL_PATH_N;
+						mazeArr[offset(0, 0)] |= CELL_PATH_S;
+						creationStack.push(make_pair((creationStack.top().first + 0), (creationStack.top().second + 1)));
+						break;
+
+					case 3: // West
+						mazeArr[offset(-1, 0)] |= CELL_VISITED | CELL_PATH_E;
+						mazeArr[offset(0, 0)] |= CELL_PATH_W;
+						creationStack.push(make_pair((creationStack.top().first - 1), (creationStack.top().second + 0)));
+						break;
+					}
+
+					//new cell
+					mazeArr[offset(0, 0)] |= CELL_VISITED;
+					visitedCells++;
+
+				}
+				else {
+					creationStack.pop();	// backtrack
+				}
+			}
+
+			for (int x = 0; x < mazeWidth; x++)
+			{
+				for (int y = 0; y < mazeHeight; y++)
+				{
+					for (int py = 0; py < pathWidth; py++)		//this draws in each cell to make the walls
+						for (int px = 0; px < pathWidth; px++)
+						{
+							if (mazeArr[y * mazeWidth + x] & CELL_VISITED)
+								Draw(x * (pathWidth + 1) + px, y * (pathWidth + 1) + py, olc::WHITE);
+							else
+								Draw(x * (pathWidth + 1) + px, y * (pathWidth + 1) + py, olc::BLUE);
+						}
+
+					// for drawing the path ways (through walls)
+					for (int p = 0; p < pathWidth; p++)
+					{
+						if (mazeArr[y * mazeWidth + x] & CELL_PATH_S)
+							Draw(x * (pathWidth + 1) + p, y * (pathWidth + 1) + pathWidth, olc::WHITE); // Draw South Passage
+						if (mazeArr[y * mazeWidth + x] & CELL_PATH_E)
+							Draw(x * (pathWidth + 1) + pathWidth, y * (pathWidth + 1) + p, olc::WHITE); // Draw East Passage
+					}
+
+				}
+			}
+
+			// for colouring the cell at the top of the stack 
+			if (visitedCells < mazeWidth * mazeHeight) {
+				for (int py = 0; py < pathWidth; py++)
+					for (int px = 0; px < pathWidth; px++)
+						Draw(creationStack.top().first * (pathWidth + 1) + px, creationStack.top().second * (pathWidth + 1) + py, olc::BLACK);
+			}
+
+		}
+		else	// maze creation is completed
+		{
+			solutionStack.push(make_pair(startingPosX, startingPosY));
+			visitedNeighbours.insert(make_pair(startingPosX, startingPosY));
+			//cout << "Solution stack starts " << m_solutionStack.top().first << ", " << m_solutionStack.top().second << "\n";
+
+			DrawCell(startingPosX, startingPosY, olc::GREEN);
+			DrawCell(endingPosX, endingPosY, olc::RED);
+
+			solutionSteps = 1;
+			mazeCreated = true;
+		}
+	}
+
 	void SolveMaze() {
 		// Check if the maze solving is possible
-		if (m_solutionStack.empty()) {
+		if (solutionStack.empty()) {
 			//cout << "Stack is empty, maze cannot be solved!" << endl;
 			return;
 		}
 
 		// Get the current cell
-		int x = m_solutionStack.top().first;
-		int y = m_solutionStack.top().second;
+		int x = solutionStack.top().first;
+		int y = solutionStack.top().second;
 
 		//cout << "Current cell: (" << x << ", " << y << ")" << endl;
 
 		auto neighbour = make_pair(x, y);
-		visited_neighbours.insert(neighbour);
+		visitedNeighbours.insert(neighbour);
 
 		//cout << "Visited cells: ";
-		/*for (auto all : visited_neighbours) {
+		/*for (auto all : visitedNeighbours) {
 			cout << " (" << all.first << ", " << all.second << ") ";
 		}*/
 
 		// Check if the current cell is the end point
-		if (x == m_nMazeWidth - 1 && y == m_nMazeHeight - 1) {
+		if (x == endingPosX && y == endingPosY) {
 			//cout << "Maze solved!" << endl;
-			//cout << "Solution stack size: " << m_solutionStack.size();
-			m_mazeSolved = true;
+			//cout << "Solution stack size: " << solutionStack.size();
+			mazeSolved = true;
 			return;
 		}
 
 		// Store and explore neighbors
 		vector<int> neighbours;
 
-		//cout << "Steps taken: " << m_solutionSteps << endl;
+		//cout << "Steps taken: " << solutionSteps << endl;
 		
 		//cout << "Available directions:";
 		//North neighbor
-		if (y > 0 && (m_maze[y * m_nMazeWidth + x] & CELL_PATH_N)) {
-			if (!ContainsPair(visited_neighbours, x, y - 1)) {
+		if (y > 0 && (mazeArr[y * mazeWidth + x] & CELL_PATH_N)) {
+			if (!ContainsPair(visitedNeighbours, x, y - 1)) {
 				//cout << " up ";
 				neighbours.push_back(0);
 			}
 		}
 		//East neighbor
-		if (x < m_nMazeWidth - 1 && (m_maze[y * m_nMazeWidth + x] & CELL_PATH_E)) {
-			if (!ContainsPair(visited_neighbours, x + 1, y)) {
+		if (x < mazeWidth - 1 && (mazeArr[y * mazeWidth + x] & CELL_PATH_E)) {
+			if (!ContainsPair(visitedNeighbours, x + 1, y)) {
 				//cout << " right ";
 				neighbours.push_back(1);
 			}
 		}
 		//South neighbor
-		if (y < m_nMazeHeight - 1 && (m_maze[y * m_nMazeWidth + x] & CELL_PATH_S)) {
-			if (!ContainsPair(visited_neighbours, x, y + 1)) {
+		if (y < mazeHeight - 1 && (mazeArr[y * mazeWidth + x] & CELL_PATH_S)) {
+			if (!ContainsPair(visitedNeighbours, x, y + 1)) {
 				//cout << " down ";
 				neighbours.push_back(2);
 			}
 		}
 		//West neighbor
-		if (x > 0 && (m_maze[y * m_nMazeWidth + x] & CELL_PATH_W)) {
-			if (!ContainsPair(visited_neighbours, x - 1, y)) {
+		if (x > 0 && (mazeArr[y * mazeWidth + x] & CELL_PATH_W)) {
+			if (!ContainsPair(visitedNeighbours, x - 1, y)) {
 				//cout << " left ";
 				neighbours.push_back(3);
 			}
@@ -287,106 +297,108 @@ protected:
 			// Move to the next cell based on the chosen direction
 			switch (next_cell_dir) {
 			case 0: // North
-				m_solutionStack.push(make_pair(x, y - 1));
+				solutionStack.push(make_pair(x, y - 1));
 				//cout << "up" << endl;
 				DrawVerticalCell(x, y, -1, olc::DARK_CYAN);
 				break;
 			case 1: // East
-				m_solutionStack.push(make_pair(x + 1, y));
+				solutionStack.push(make_pair(x + 1, y));
 				//cout << "right" << endl;
 				DrawHorizontalCell(x, y, 1, olc::DARK_CYAN);
 				break;
 			case 2: // South
-				m_solutionStack.push(make_pair(x, y + 1));
+				solutionStack.push(make_pair(x, y + 1));
 				//cout << "down" << endl;
 				DrawVerticalCell(x, y, 1, olc::DARK_CYAN);
 				break;
 			case 3: // West
-				m_solutionStack.push(make_pair(x - 1, y));
+				solutionStack.push(make_pair(x - 1, y));
 				//cout << "left" << endl;
 				DrawHorizontalCell(x, y, -1, olc::DARK_CYAN);
 				break;
 			}
-			//cout << endl;
+			cout << endl;
 			auto neighbour = make_pair(x, y);
-			m_solutionSteps++;
-			visited_neighbours.insert(neighbour);
-			fastest_route.push_back(neighbour);
+			solutionSteps++;
+			visitedNeighbours.insert(neighbour);
+			shortestRoute.push_back(neighbour);
 		}
 		else {
 			// If no unvisited neighbour is available, backtrack
-			if (ContainsPair(fastest_route, m_solutionStack.top().first, m_solutionStack.top().second)) {
+			if (ContainsPair(shortestRoute, solutionStack.top().first, solutionStack.top().second)) {
 				// if this != starting cell
-				auto it = std::remove(fastest_route.begin(), fastest_route.end(), make_pair(m_solutionStack.top().first, m_solutionStack.top().second));
+				auto it = std::remove(shortestRoute.begin(), shortestRoute.end(), make_pair(solutionStack.top().first, solutionStack.top().second));
 
 				// Erase the pair from the vector
-				fastest_route.erase(it, fastest_route.end());
+				shortestRoute.erase(it, shortestRoute.end());
 			}
 
-			m_solutionStack.pop();
+			solutionStack.pop();
 			//cout << "Backtracked" << endl;
 		}
 
 		// Drawing in all the visited cells
-		for (auto v : visited_neighbours) {
+		for (auto v : visitedNeighbours) {
 			DrawCell(v.first, v.second, olc::DARK_CYAN);
 		}
 
 		// Drawing in the top of the stack for visibility 
-		DrawCell(m_solutionStack.top().first, m_solutionStack.top().second, olc::GREEN);
+		DrawCell(solutionStack.top().first, solutionStack.top().second, olc::GREEN);
 		// Drawing the starting cell
-		DrawCell(0, 0, olc::GREEN);
+		DrawCell(startingPosX, startingPosY, olc::GREEN);
+		DrawCell(endingPosX, endingPosY, olc::RED);
 	}
 
 	void DrawShortestRoute() {
-		// 0, 0
 		int counter = 0;
-		auto prev = *fastest_route.begin();
+		auto prev = *shortestRoute.begin();
 		//cout << prev.first << " " << prev.second;
 
 		//auto current = prev;
-		for (auto current : fastest_route) {
-
+		for (auto current : shortestRoute) {
 			// 0, 0		1, 0	(moves to right)
-			if (prev.first > current.first)
+			if (prev.first > current.first) {
 				DrawHorizontalCell(current.first, current.second, 1, olc::YELLOW);
+			}
 
-			else if (prev.first < current.first)
+			else if (prev.first < current.first) {
 				DrawHorizontalCell(current.first, current.second, -1, olc::YELLOW);
-
+			}
+				
 			// 0, 0		0, 1	(moves up)
-			else if (prev.second > current.second)
+			else if (prev.second > current.second) {
 				DrawVerticalCell(current.first, current.second, 1, olc::YELLOW);
+			}
 
-			else if (prev.second < current.second)
+			else if (prev.second < current.second) {
 				DrawVerticalCell(current.first, current.second, -1, olc::YELLOW);
+			}
 
 			counter++;
 			prev = current;
 			//cout << endl << prev.first << ", " << prev.second;
 		}
-		cout << "Steps taken to find end: " << m_solutionSteps << endl;
+		cout << "Steps taken to find end: " << solutionSteps << endl;
 		cout << "Shortest route: " << counter;
 		shortestRouteFound = true;
 	}
 
-
 	void DrawHorizontalCell(int x, int y, int dir, olc::Pixel colour) {
 		if (dir == -1) {	//left
-			for (int py = 0; py < m_nPathWidth; py++)
+			for (int py = 0; py < pathWidth; py++)
 			{
-				for (int px = -1; px < m_nPathWidth; px++)
+				for (int px = -1; px < pathWidth; px++)
 				{
-					Draw(x * (m_nPathWidth + 1) + px, y * (m_nPathWidth + 1) + py, colour); // Draw Cell
+					Draw(x * (pathWidth + 1) + px, y * (pathWidth + 1) + py, colour); // Draw Cell
 				}
 			}
 		}
 		else if (dir == 1) {	//right
-			for (int py = 0; py < m_nPathWidth; py++)
+			for (int py = 0; py < pathWidth; py++)
 			{
-				for (int px = 0; px < m_nPathWidth + 1; px++)
+				for (int px = 0; px < pathWidth + 1; px++)
 				{
-					Draw(x * (m_nPathWidth + 1) + px, y * (m_nPathWidth + 1) + py, colour); // Draw Cell
+					Draw(x * (pathWidth + 1) + px, y * (pathWidth + 1) + py, colour); // Draw Cell
 				}
 			}
 		}
@@ -394,20 +406,20 @@ protected:
 
 	void DrawVerticalCell(int x, int y, int dir, olc::Pixel colour) {
 		if (dir == -1) {	//down
-			for (int py = -1; py < m_nPathWidth; py++)
+			for (int py = -1; py < pathWidth; py++)
 			{
-				for (int px = 0; px < m_nPathWidth; px++)
+				for (int px = 0; px < pathWidth; px++)
 				{
-					Draw(x * (m_nPathWidth + 1) + px, y * (m_nPathWidth + 1) + py, colour); // Draw Cell
+					Draw(x * (pathWidth + 1) + px, y * (pathWidth + 1) + py, colour); // Draw Cell
 				}
 			}
 		}
 		else if (dir == 1) {	//up
-			for (int py = 0; py < m_nPathWidth + 1; py++)
+			for (int py = 0; py < pathWidth + 1; py++)
 			{
-				for (int px = 0; px < m_nPathWidth; px++)
+				for (int px = 0; px < pathWidth; px++)
 				{
-					Draw(x * (m_nPathWidth + 1) + px, y * (m_nPathWidth + 1) + py, colour); // Draw Cell
+					Draw(x * (pathWidth + 1) + px, y * (pathWidth + 1) + py, colour); // Draw Cell
 				}
 			}
 		}
@@ -433,47 +445,22 @@ protected:
 		return false;
 	}
 
-
-	void DrawStartingPositionCell(int x, int y)
-	{
-		for (int py = 0; py < m_nPathWidth; py++)
-		{
-			for (int px = 0; px < m_nPathWidth; px++)
-			{
-				Draw(x * (m_nPathWidth + 1) + px, y * (m_nPathWidth + 1) + py, olc::DARK_CYAN); // Draw Cell
-			}
-		}
-	}
-	void DrawEndPositionCell(int x, int y)
-	{
-		for (int py = 0; py < m_nPathWidth; py++)
-		{
-			for (int px = 0; px < m_nPathWidth; px++)
-			{
-				Draw(x * (m_nPathWidth + 1) + px, y * (m_nPathWidth + 1) + py, olc::RED); // Draw Cell
-			}
-		}
-	}
 	void DrawCell(int x, int y, olc::Pixel colour) {
-		for (int py = 0; py < m_nPathWidth; py++)
+		for (int py = 0; py < pathWidth; py++)
 		{
-			for (int px = 0; px < m_nPathWidth; px++)
+			for (int px = 0; px < pathWidth; px++)
 			{
-				Draw(x * (m_nPathWidth + 1) + px, y * (m_nPathWidth + 1) + py, colour); // Draw Cell
+				Draw(x * (pathWidth + 1) + px, y * (pathWidth + 1) + py, colour); // Draw Cell
 			}
 		}
 	}
 };
 
 
-
-
 int main()
 {
-	srand(time(nullptr));
 	Maze maze;
 	maze.Construct(160, 100, 8, 8);		//160x100 chars, 8x8 pixels
 	maze.Start();
-
 	return 0;
 }
