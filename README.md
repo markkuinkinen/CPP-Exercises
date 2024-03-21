@@ -1,1 +1,1 @@
-Lab exercises for C++ Programming and Data Structures and Algorithms
+Project and exercises for two C++ courses
